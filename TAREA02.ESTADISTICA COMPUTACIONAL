@@ -1,0 +1,34 @@
+#CODIGO EJECUTADO EN RSTUDIO QUE ME PERMITE REALIZAR CALCULOS ESTADISTICOS QUE  ANALIZAN UN DATA SET CON ANOVA 
+\begin{verbatim}
+# Crear el conjunto de datos
+data <- data.frame(
+  Año = c(2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021),
+  Medico = c(100, 120, 118, 112, 110, 58, 118, 57, 57),
+  Odontologia = c(100, 70, 105, 158, 63, 114, 62, 49, 18),
+  Enfermeria = c(110, 115, 138, 100, 185, 190, 35, 38, 22),
+  Obstetricia = c(40, 45, 66, 40, 59, 33, 65, 40, 34)
+)
+
+# Transformar los datos para ANOVA
+data_long <- reshape(data,
+                     varying = c("Medico", "Odontologia", "Enfermeria", "Obstetricia"),
+                     v.names = "Mortalidad",
+                     timevar = "Profesional",
+                     times = c("Medico", "Odontologia", "Enfermeria", "Obstetricia"),
+                     direction = "long")
+
+# Visualizar la estructura de los datos
+head(data_long)
+
+# Realizar ANOVA
+anova_result <- aov(Mortalidad ~ Profesional, data = data_long)
+
+# Mostrar los resultados del ANOVA
+summary(anova_result)
+
+# Realizar un gráfico de los resultados
+boxplot(Mortalidad ~ Profesional, data = data_long,
+        main = "Comparación de Mortalidad entre Profesionales de la Salud",
+        xlab = "Profesionales", ylab = "Mortalidad",
+        col = c("lightblue", "lightgreen", "lightcoral", "lightyellow"))
+\end{verbatim}
