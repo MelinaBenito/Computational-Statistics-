@@ -1,0 +1,242 @@
+# CARGA DE LIBRERÍAS
+library(shiny)
+library(readr)
+library(DT)
+library(ggplot2)
+library(dplyr)
+library(stats)
+library(car)
+library(writexl)
+library(readxl)
+
+# INTERFAZ DE USUARIO
+ui <- fluidPage(
+  titlePanel("Aplicación de Análisis Estadístico"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      fileInput("file", "Importar archivo (.csv, .txt, .xlsx)", accept = c(".csv", ".txt", ".xlsx")),
+      uiOutput("select_var_desc"),
+      uiOutput("select_var_inf"),
+      uiOutput("select_var_group"),
+      uiOutput("select_var_x"),
+      uiOutput("select_var_y")
+    ),
+    
+    mainPanel(
+      tabsetPanel(
+        tabPanel("Vista previa", DTOutput("tabla")),
+        
+        tabPanel("Estadística Descriptiva", 
+                 h4("Medidas de Tendencia Central y Dispersión"),
+                 tableOutput("resumen"),
+                 h4("Gráficos Estadísticos"),
+                 plotOutput("grafico_histograma"),
+                 plotOutput("grafico_caja")),
+        
+        tabPanel("Estadística Inferencial",
+                 h4("Pruebas t de Student"),
+                 verbatimTextOutput("t_test"),
+                 h4("ANOVA"),
+                 verbatimTextOutput("anova"),
+                 h4("Prueba U de Mann-Whitney"),
+                 verbatimTextOutput("mann_whitney"),
+                 h4("Prueba Shapiro-Wilk (Normalidad)"),
+                 verbatimTextOutput("shapiro_test"),
+                 h4("Prueba Chi-Cuadrado"),
+                 verbatimTextOutput("chi_square")),
+        
+        tabPanel("Modelado",
+                 h4("Regresión Lineal"),
+                 verbatimTextOutput("regresion_lineal"),
+                 h4("Correlación de Pearson"),
+                 verbatimTextOutput("correlacion_pearson"),
+                 h4("Prueba de Kruskal-Wallis"),
+                 verbatimTextOutput("kruskal_wallis")),
+        
+        tabPanel("Reportes",
+                 h4("Descargar Resultados"),
+                 downloadButton("descargar_excel", "Descargar Excel"))
+      )
+    )
+  )
+)
+
+# SERVIDOR
+server <- function(input, output) {
+  
+  # LECTURA DE DATOS
+  datos <- reactive({
+    req(input$file)
+    ext <- tools::file_ext(input$file$name)
+    
+    switch(ext,
+           "csv" = read.csv(input$file$datapath, header = TRUE),
+           "txt" = read.delim(input$file$datapath, header = TRUE, sep = "\t"),
+           "xlsx" = read_xlsx(input$file$datapath),
+           stop("Formato de archivo no soportado.")
+    )
+  })
+  
+  # VISTA PREVIA
+  output$tabla <- renderDT({
+    datatable(datos())
+  })
+  
+  # UI Dinámica
+  output$select_var_desc <- renderUI({
+    req(datos())
+    selectInput("var_desc", "Variable numérica", choices = names(datos()))
+  })
+  
+  output$select_var_inf <- renderUI({
+    req(datos())
+    selectInput("var_inf", "Variable para análisis inferencial", choices = names(datos()))
+  })
+  
+  output$select_var_group <- renderUI({
+    req(datos())
+    selectInput("var_group", "Variable de grupo", choices = names(datos()))
+  })
+  
+  output$select_var_x <- renderUI({
+    req(datos())
+    selectInput("var_x", "Variable independiente (X)", choices = names(datos()))
+  })
+  
+  output$select_var_y <- renderUI({
+    req(datos())
+    selectInput("var_y", "Variable dependiente (Y)", choices = names(datos()))
+  })
+  
+  # ESTADÍSTICA DESCRIPTIVA
+  output$resumen <- renderTable({
+    req(input$var_desc)
+    variable <- datos()[[input$var_desc]]
+    if (is.numeric(variable)) {
+      data.frame(
+        Media = mean(variable, na.rm = TRUE),
+        Mediana = median(variable, na.rm = TRUE),
+        Moda = names(sort(table(variable), decreasing = TRUE)[1]),
+        Desviación = sd(variable, na.rm = TRUE),
+        Varianza = var(variable, na.rm = TRUE),
+        Mínimo = min(variable, na.rm = TRUE),
+        Máximo = max(variable, na.rm = TRUE),
+        Rango = diff(range(variable, na.rm = TRUE))
+      )
+    } else {
+      data.frame(Nota = "Selecciona una variable numérica")
+    }
+  })
+  
+  output$grafico_histograma <- renderPlot({
+    req(input$var_desc)
+    variable <- datos()[[input$var_desc]]
+    if (is.numeric(variable)) {
+      ggplot(data = data.frame(variable), aes(x = variable)) +
+        geom_histogram(binwidth = 1, fill = "blue", color = "black", alpha = 0.7) +
+        labs(title = "Histograma", x = input$var_desc, y = "Frecuencia")
+    }
+  })
+  
+  output$grafico_caja <- renderPlot({
+    req(input$var_desc)
+    variable <- datos()[[input$var_desc]]
+    if (is.numeric(variable)) {
+      ggplot(data = data.frame(variable), aes(y = variable)) +
+        geom_boxplot(fill = "green", color = "black") +
+        labs(title = "Gráfico de Caja", y = input$var_desc)
+    }
+  })
+  
+  # ESTADÍSTICA INFERENCIAL
+  output$t_test <- renderPrint({
+    req(input$var_inf, input$var_group)
+    t.test(as.formula(paste(input$var_inf, "~", input$var_group)), data = datos())
+  })
+  
+  output$anova <- renderPrint({
+    req(input$var_inf, input$var_group)
+    summary(aov(as.formula(paste(input$var_inf, "~", input$var_group)), data = datos()))
+  })
+  
+  output$mann_whitney <- renderPrint({
+    req(input$var_inf, input$var_group)
+    wilcox.test(as.formula(paste(input$var_inf, "~", input$var_group)), data = datos())
+  })
+  
+  output$shapiro_test <- renderPrint({
+    req(input$var_inf)
+    variable <- datos()[[input$var_inf]]
+    if (length(na.omit(variable)) >= 3 && length(na.omit(variable)) <= 5000) {
+      shapiro.test(variable)
+    } else {
+      "La prueba de Shapiro-Wilk requiere entre 3 y 5000 observaciones sin NA."
+    }
+  })
+  
+  output$chi_square <- renderPrint({
+    req(input$var_inf)
+    var <- datos()[[input$var_inf]]
+    if (is.factor(var) || is.character(var)) {
+      chisq.test(table(var))
+    } else {
+      "Selecciona una variable categórica para la prueba Chi-Cuadrado"
+    }
+  })
+  
+  # MODELADO
+  output$regresion_lineal <- renderPrint({
+    req(input$var_x, input$var_y)
+    if (is.numeric(datos()[[input$var_x]]) && is.numeric(datos()[[input$var_y]])) {
+      modelo <- lm(as.formula(paste(input$var_y, "~", input$var_x)), data = datos())
+      summary(modelo)
+    } else {
+      "Ambas variables deben ser numéricas para aplicar regresión lineal."
+    }
+  })
+  
+  output$correlacion_pearson <- renderPrint({
+    req(input$var_x, input$var_y)
+    if (is.numeric(datos()[[input$var_x]]) && is.numeric(datos()[[input$var_y]])) {
+      cor(datos()[[input$var_x]], datos()[[input$var_y]], method = "pearson")
+    } else {
+      "Ambas variables deben ser numéricas para calcular correlación de Pearson."
+    }
+  })
+  
+  output$kruskal_wallis <- renderPrint({
+    req(input$var_inf, input$var_group)
+    kruskal.test(as.formula(paste(input$var_inf, "~", input$var_group)), data = datos())
+  })
+  
+  # EXPORTACIÓN
+  output$descargar_excel <- downloadHandler(
+    filename = function() {
+      paste("resultados_estadisticos_", Sys.Date(), ".xlsx", sep = "")
+    },
+    content = function(file) {
+      req(input$var_inf, input$var_group)
+      datos_df <- datos()
+      t_test <- capture.output(t.test(as.formula(paste(input$var_inf, "~", input$var_group)), data = datos_df))
+      anova <- capture.output(summary(aov(as.formula(paste(input$var_inf, "~", input$var_group)), data = datos_df)))
+      shapiro <- capture.output(shapiro.test(datos_df[[input$var_inf]]))
+      mann_whitney <- capture.output(wilcox.test(as.formula(paste(input$var_inf, "~", input$var_group)), data = datos_df))
+      chi <- capture.output(chisq.test(table(datos_df[[input$var_inf]])))
+      
+      salida <- data.frame(
+        Prueba = c("T-Test", "ANOVA", "Shapiro-Wilk", "Mann-Whitney", "Chi-Cuadrado"),
+        Resultado = c(
+          paste(t_test, collapse = "\n"),
+          paste(anova, collapse = "\n"),
+          paste(shapiro, collapse = "\n"),
+          paste(mann_whitney, collapse = "\n"),
+          paste(chi, collapse = "\n")
+        )
+      )
+      write_xlsx(salida, path = file)
+    }
+  )
+}
+
+shinyApp(ui = ui, server = server)
