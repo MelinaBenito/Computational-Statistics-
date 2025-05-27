@@ -1,0 +1,253 @@
+Modelado Basado en Agentes Inspirado en la Competencia Espermática
+Este sistema simula la carrera de espermatozoides hacia el óvulo, replicando mecanismos biológicos como la quimiotaxis, la selección energética y la optimización de rutas. El modelo destaca cómo propiedades emergentes (como la selección del "mejor" gameto) surgen de reglas individuales simples.
+
+# Librerías científicas y de simulación
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.spatial.distance import cdist
+import random
+import pandas as pd
+from collections import Counter
+import warnings
+import math
+
+# Mesa: para modelado basado en agentes
+from mesa import Agent, Model
+from mesa.space import ContinuousSpace
+from mesa.time import RandomActivation
+
+# Configuración general
+warnings.filterwarnings('ignore')
+plt.style.use('seaborn-v0_8')
+sns.set_palette("husl")
+np.random.seed(42)      # Reproducibilidad en NumPy
+random.seed(42)         # Reproducibilidad en random
+
+print("✓ Librerías cargadas exitosamente")
+print("✓ Configuración de visualización establecida")
+
+
+1. Parámetros del Modelo
+class ParametrosFecundacion:
+    def __init__(self):
+        self.cantidad_total = 2000
+        self.proporcion_tipo1 = 0.5
+        self.velocidad_tipo1 = 1.2
+        self.velocidad_tipo2 = 1.0
+        self.resistencia_tipo1 = 0.98
+        self.resistencia_tipo2 = 0.96
+        self.espacio_ancho = 100
+        self.espacio_alto = 100
+        self.distancia_meta = 3
+
+    def mostrar_parametros(self):
+        print("🔧 Parámetros de simulación:")
+        print(f"   • Espermatozoides: {self.cantidad_total} (Tipo 1: {int(self.cantidad_total*self.proporcion_tipo1)}, Tipo 2: {int(self.cantidad_total*(1-self.proporcion_tipo1))})")
+        print(f"   • Velocidades: Tipo 1 = {self.velocidad_tipo1}, Tipo 2 = {self.velocidad_tipo2}")
+        print(f"   • Resistencias: Tipo 1 = {self.resistencia_tipo1}, Tipo 2 = {self.resistencia_tipo2}")
+        print(f"   • Tiempo máximo: 30 minutos")
+        print()
+
+# Crear instancia y mostrar parámetros
+params = ParametrosFecundacion()
+params.mostrar_parametros()
+
+
+2. Implementación del Modelo
+
+import numpy as np
+import random
+
+class ModeloFecundacion:
+    def __init__(self, parametros):
+        self.params = parametros
+        self.espermatozoides = []
+        self.iteracion_actual = 0  # representa el minuto actual
+        self.llegaron = []
+        self.fecundado = False
+        self.ganador = None
+
+    def inicializar_poblacion(self):
+        total = self.params.cantidad_total
+        n_tipo1 = int(total * self.params.proporcion_tipo1)
+        n_tipo2 = total - n_tipo1
+
+        for _ in range(n_tipo1):
+            self.espermatozoides.append(self.crear_espermatozoide(tipo=1))
+        for _ in range(n_tipo2):
+            self.espermatozoides.append(self.crear_espermatozoide(tipo=2))
+
+    def crear_espermatozoide(self, tipo):
+        velocidad = self.params.velocidad_tipo1 if tipo == 1 else self.params.velocidad_tipo2
+        resistencia = self.params.resistencia_tipo1 if tipo == 1 else self.params.resistencia_tipo2
+
+        return {
+            'tipo': tipo,
+            'pos': np.array([random.uniform(0, self.params.espacio_ancho),
+                             random.uniform(0, self.params.espacio_alto)]),
+            'velocidad': velocidad,
+            'resistencia': resistencia,
+            'vivo': True
+        }
+
+    def mover(self, espermatozoide):
+        if not espermatozoide['vivo']:
+            return
+
+        angulo = random.uniform(0, 2 * np.pi)
+        desplazamiento = np.array([np.cos(angulo), np.sin(angulo)]) * espermatozoide['velocidad']
+        nueva_pos = espermatozoide['pos'] + desplazamiento
+        nueva_pos[0] = np.clip(nueva_pos[0], 0, self.params.espacio_ancho)
+        nueva_pos[1] = np.clip(nueva_pos[1], 0, self.params.espacio_alto)
+        espermatozoide['pos'] = nueva_pos
+
+        if random.random() > espermatozoide['resistencia']:
+            espermatozoide['vivo'] = False
+
+    def distancia_a_ovulo(self, espermatozoide):
+        ovulo = np.array([self.params.espacio_ancho / 2, self.params.espacio_alto / 2])
+        return np.linalg.norm(espermatozoide['pos'] - ovulo)
+
+    def eliminar_azar_espermatozoides(self):
+        vivos = [e for e in self.espermatozoides if e['vivo']]
+        a_eliminar = random.randint(50, 66)
+        random.shuffle(vivos)
+        for e in vivos[:a_eliminar]:
+            e['vivo'] = False
+
+    def ejecutar_iteracion(self):
+        for espermatozoide in self.espermatozoides:
+            if espermatozoide['vivo']:
+                self.mover(espermatozoide)
+                if not self.fecundado and self.distancia_a_ovulo(espermatozoide) <= self.params.distancia_meta:
+                    espermatozoide['vivo'] = False
+                    self.ganador = espermatozoide
+                    self.fecundado = True
+                elif self.distancia_a_ovulo(espermatozoide) <= self.params.distancia_meta:
+                    espermatozoide['vivo'] = False  # muere después si ya ocurrió fecundación
+
+        self.eliminar_azar_espermatozoides()
+
+    def simular(self):
+        print("\n🚀 Iniciando simulación de fecundación...\n")
+        self.inicializar_poblacion()
+
+        for minuto in range(30):  # 30 minutos de simulación
+            self.iteracion_actual += 1
+            self.ejecutar_iteracion()
+
+        self.mostrar_resultados()
+
+    def mostrar_resultados(self):
+        print("📊 RESULTADOS:")
+        print(f"   • Minutos transcurridos: {self.iteracion_actual}")
+        total_llegaron = 1 if self.ganador else 0
+        print(f"   • Espermatozoides que llegaron al óvulo: {total_llegaron}")
+
+        if self.ganador:
+            tipo = self.ganador['tipo']
+            print(f"\n🎉 ¡Fecundación exitosa! El espermatozoide ganador fue del Tipo {tipo}")
+        else:
+            print("❌ Ningún espermatozoide logró fecundar el óvulo.")
+
+# Asegúrate de definir esta clase también
+class ParametrosFecundacion:
+    def __init__(self):
+        self.cantidad_total = 2000
+        self.proporcion_tipo1 = 0.5
+        self.velocidad_tipo1 = 1.2
+        self.velocidad_tipo2 = 1.0
+        self.resistencia_tipo1 = 0.98
+        self.resistencia_tipo2 = 0.96
+        self.espacio_ancho = 100
+        self.espacio_alto = 100
+        self.distancia_meta = 3
+
+    def mostrar_parametros(self):
+        print("🔧 Parámetros de simulación:")
+        print(f"   • Espermatozoides: {self.cantidad_total} (Tipo 1: {int(self.cantidad_total*self.proporcion_tipo1)}, Tipo 2: {int(self.cantidad_total*(1-self.proporcion_tipo1))})")
+        print(f"   • Velocidades: Tipo 1 = {self.velocidad_tipo1}, Tipo 2 = {self.velocidad_tipo2}")
+        print(f"   • Resistencias: Tipo 1 = {self.resistencia_tipo1}, Tipo 2 = {self.resistencia_tipo2}")
+        print(f"   • Tiempo máximo: 30 minutos")
+        print()
+
+if __name__ == "__main__":
+    params = ParametrosFecundacion()
+    params.mostrar_parametros()
+
+    modelo = ModeloFecundacion(params)
+    modelo.simular()
+
+
+
+
+3. Funciones de Visualización
+class SimulacionEspermatozoides:
+    def __init__(self):
+        self.tiempo_total = 30  # minutos
+        self.tiempo = list(range(self.tiempo_total + 1))  # de 0 a 30 minutos
+        self.sobrevivientes = self.simular_sobrevivientes()
+        self.fecundacion_lograda = 1  # solo uno fecunda al óvulo
+        self.muertos_post_fecundacion = self.sobrevivientes[-1] - self.fecundacion_lograda
+
+    def simular_sobrevivientes(self):
+        vivos = 2000
+        registro = [vivos]
+        for _ in range(self.tiempo_total):
+            muertos = np.random.randint(50, 67)  # entre 50 y 66 mueren por minuto
+            vivos = max(0, vivos - muertos)
+            registro.append(vivos)
+        return registro
+
+# Crear instancia del modelo
+modelo = SimulacionEspermatozoides()
+
+# Función de visualización
+def visualizar_dinamica_sobrevivencia(modelo):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(modelo.tiempo, modelo.sobrevivientes, color='dodgerblue', linewidth=2, marker='o')
+    ax.axhline(y=modelo.fecundacion_lograda, color='red', linestyle='--', label='Espermatozoide que fecunda')
+    ax.set_title("Dinamica de Sobrevivencia de Espermatozoides en el Útero", fontsize=14, fontweight='bold')
+    ax.set_xlabel("Tiempo (minutos)")
+    ax.set_ylabel("Cantidad de Espermatozoides Vivos")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+print("✓ Funciones de visualización implementadas")
+
+4. Experimento Básico
+def simular(self):
+    print("🔬 EXPERIMENTO 1: Simulación Básica")
+    print("=" * 55)
+    print("\n🚀 Iniciando simulación del Modelo de Fecundación...\n")
+    self.inicializar_poblacion()
+
+    for minuto in range(30):  # 30 minutos de simulación
+        self.iteracion_actual += 1
+        self.ejecutar_iteracion()
+
+    self.mostrar_resultados()
+
+if __name__ == "__main__":
+    params = ParametrosFecundacion()
+    params.mostrar_parametros()
+
+    print("🔬 EXPERIMENTO 1: Simulación Básica")
+    print("=" * 55)
+
+    modelo = ModeloFecundacion(params)
+    modelo.simular()
+
+    print("\n📊 Visualizando resultados...")
+
+5. Experimentos con Diferentes Parámetros
+6. Análisis Teórico y Discusión
+
+
+
+
+
