@@ -1,0 +1,48 @@
+import pandas as pd
+
+df = pd.read_csv("base_datos.csv", sep=';')
+
+variables_numericas = ['PESO_NACIDO', 'DUR_EMB_PARTO']
+df_numericas = df[variables_numericas]
+
+estadisticas = pd.DataFrame({
+    'Media': df_numericas.mean(),
+    'Desviación Estándar': df_numericas.std(),
+    'Varianza': df_numericas.var(),
+    'Coeficiente de Variación (%)': (df_numericas.std() / df_numericas.mean()) * 100
+})
+
+print("\n Estadísticas descriptivas de variables numéricas ===")
+print(estadisticas.round(2))
+/****************************/
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+
+df = pd.read_csv("base_datos.csv", sep=';')
+print("Columnas en el CSV:")
+print(df.columns.tolist())
+
+variables = [
+    'PESO_NACIDO', 'DUR_EMB_PARTO', 'SEXO_NACIDO', 'TIPO_PARTO',
+    'MALFORMACION_CONGENITA', 'FINANCIADOR_PARTO',
+    'CONDICION_PARTO', 'LACTANCIA_PRECOZ'
+]
+df = df[variables]
+df_encoded = pd.get_dummies(df, drop_first=True)
+
+scaler = StandardScaler()
+df_scaled = scaler.fit_transform(df_encoded)
+
+pca = PCA(n_components=2)
+pca_result = pca.fit_transform(df_scaled)
+
+plt.figure(figsize=(8, 6))
+plt.scatter(pca_result[:, 0], pca_result[:, 1], c='blue', edgecolors='k', s=70)
+plt.title("PCA - Análisis de Nacimientos")
+plt.xlabel("Componente Principal 1")
+plt.ylabel("Componente Principal 2")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
