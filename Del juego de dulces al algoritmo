@@ -1,0 +1,122 @@
+import random
+from collections import Counter
+
+def simular_juego():
+    """
+    Simula el juego de los dulces y chupetines.
+    Permite al usuario introducir los dulces iniciales desde la consola.
+    """
+
+    print("--- Simulación del Juego de Dulces y Chupetines ---")
+    print("Objetivo: Obtener 10 chupetines.")
+    print("Reglas:")
+    print("  - 6 dulces (2 pera, 2 huevo, 2 limón) = 1 chupetín + 2 dulces adicionales.")
+    print("  - 3 chupetines = 6 dulces de limón + 6 de pera + 6 de huevo.")
+    print("-" * 40)
+
+    # Solicitar dulces iniciales al usuario
+    try:
+        dulces_limon = int(input("Introduce la cantidad inicial de dulces de Limón: "))
+        dulces_pera = int(input("Introduce la cantidad inicial de dulces de Pera: "))
+        dulces_huevo = int(input("Introduce la cantidad inicial de dulces de Huevo: "))
+    except ValueError:
+        print("Entrada inválida. Por favor, introduce números enteros.")
+        return
+
+    inventario_dulces = {
+        'limon': dulces_limon,
+        'pera': dulces_pera,
+        'huevo': dulces_huevo
+    }
+    chupetines = 0
+    chupetines_obtenidos_total = 0
+    pasos = 0
+
+    print("\n--- Estado Inicial ---")
+    print(f"Dulces: {inventario_dulces}")
+    print(f"Chupetines: {chupetines}")
+    print("-" * 40)
+
+    while chupetines_obtenidos_total < 10 and pasos < 1000: # Límite de pasos para evitar bucles infinitos
+        pasos += 1
+        print(f"\n--- Paso {pasos} ---")
+        print(f"Inventario Actual: {inventario_dulces} | Chupetines: {chupetines} | Chupetines Objetivo: {chupetines_obtenidos_total}/10")
+
+        # Estrategia: Priorizar el canje de 3 chupetines si es posible y necesario
+        if chupetines >= 3:
+            print("Estrategia: ¡Activando ciclo de recarga de 3 chupetines por 18 dulces!")
+            chupetines -= 3
+            inventario_dulces['limon'] += 6
+            inventario_dulces['pera'] += 6
+            inventario_dulces['huevo'] += 6
+            print(f"¡Has canjeado 3 chupetines por 6 de cada sabor! Nuevo inventario: {inventario_dulces}")
+            continue # Vuelve a evaluar las acciones con los nuevos dulces
+
+        # Intentar formar un paquete de 6 dulces
+        if inventario_dulces['limon'] >= 2 and \
+           inventario_dulces['pera'] >= 2 and \
+           inventario_dulces['huevo'] >= 2:
+
+            print("Estrategia: Formando un paquete de 6 dulces para obtener un chupetín.")
+            inventario_dulces['limon'] -= 2
+            inventario_dulces['pera'] -= 2
+            inventario_dulces['huevo'] -= 2
+
+            chupetines += 1
+            chupetines_obtenidos_total += 1
+
+            if chupetines_obtenidos_total == 10:
+                print("\n¡¡¡FELICIDADES!!! Has obtenido los 10 chupetines.")
+                print(f"Dulces finales: {inventario_dulces}")
+                print(f"Chupetines finales: {chupetines}")
+                return
+
+            print(f"¡Chupetín obtenido! Tienes {chupetines_obtenidos_total} en total.")
+
+            # Elegir 2 dulces adicionales de forma estratégica (priorizar los más escasos)
+            dulces_restantes = sorted(inventario_dulces.items(), key=lambda item: item[1])
+
+            # Asegurarse de que el dulce_1 y dulce_2 existan antes de acceder a ellos
+            if len(dulces_restantes) >= 2:
+                dulce_1_nombre = dulces_restantes[0][0]
+                dulce_2_nombre = dulces_restantes[1][0]
+            elif len(dulces_restantes) == 1:
+                dulce_1_nombre = dulces_restantes[0][0]
+                dulce_2_nombre = dulces_restantes[0][0] # Si solo queda un tipo, elige ese dos veces
+            else: # No quedan dulces, es un caso de fallo, aunque en este punto debería haber.
+                dulce_1_nombre = 'limon' # Valor por defecto para evitar errores
+                dulce_2_nombre = 'pera'   # Valor por defecto para evitar errores
+
+            print(f"Recibes 2 dulces adicionales. Elegimos: 1 de {dulce_1_nombre} y 1 de {dulce_2_nombre}.")
+            inventario_dulces[dulce_1_nombre] += 1
+            inventario_dulces[dulce_2_nombre] += 1
+            print(f"Nuevo inventario después de recibir adicionales: {inventario_dulces}")
+
+        # Si no se puede formar un paquete de 6 y no se puede hacer la recarga de 3 chupetines
+        # Pero tenemos al menos 1 chupetín para cambiar por dulces específicos
+        elif chupetines >= 1:
+            print("Estrategia: No se puede formar un paquete de 6. Usando 1 chupetín para obtener dulces específicos.")
+            chupetines -= 1
+
+            # Identificar el sabor más escaso para reponer
+            sabor_mas_escaso = min(inventario_dulces, key=inventario_dulces.get)
+
+            print(f"Gastas 1 chupetín para obtener 6 dulces de {sabor_mas_escaso}.")
+            inventario_dulces[sabor_mas_escaso] += 6
+            print(f"Nuevo inventario: {inventario_dulces}")
+
+        else:
+            print("\n--- ¡Juego Terminado! ---")
+            print("No se pueden formar más paquetes y no hay chupetines para canjear por dulces.")
+            print(f"Chupetines obtenidos: {chupetines_obtenidos_total}/10.")
+            print("Parece que el equipo se quedó sin recursos para continuar.")
+            break
+
+    if pasos >= 1000:
+        print("\n--- ¡Límite de pasos alcanzado! ---")
+        print("La simulación se detuvo para evitar un bucle infinito.")
+        print(f"Chupetines obtenidos: {chupetines_obtenidos_total}/10.")
+        print("Es posible que el juego no sea terminable con estos recursos o estrategia.")
+
+# Ejecutar la simulación
+simular_juego()
